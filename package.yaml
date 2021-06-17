@@ -1,0 +1,22 @@
+name:                Weather-server
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/githubuser/Weather-server#readme
+license:             MIT
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2021 Author name here
+category:            Web
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - server
+
+
+executables:
+  Weather-server:
+    source-dirs:      src
+    main:             Main.hs
