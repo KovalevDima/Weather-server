@@ -52,7 +52,7 @@ type WeatherAPI =
 
 
 -- This function checks the cash for inforomation about weather 
--- and returns it if this information exist, otherwise
+-- and returns this information if it's exists, otherwise
 -- it perform an API request
 getWeather :: Cash -> Location -> Date -> APIKey -> Handler Weather
 getWeather cash loc date key =
