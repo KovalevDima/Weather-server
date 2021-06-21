@@ -1,16 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
-import Lib
+import Lib ( runApp, ServerEnviroment(..) )
 
 
 env :: ServerEnviroment
 env = ServerEnviroment
-        { port = 8080
-        , locations = []
+        { serverPort = 8080
+        , locations = ["London", "Boston"]
         , apikey = ""
-        , rootAPI = ""
+        , rootAPI = "weather"
+        , cacheFillingsDelay = 30 * 1000000  -- miliseconds
+        , maxTimeDeviation = 50 -- seconds
         }
 
 main :: IO ()
 main = do
-        runServer 8080 env
+        runApp env
