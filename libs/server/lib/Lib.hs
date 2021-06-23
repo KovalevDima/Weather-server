@@ -1,9 +1,15 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Lib 
     ( runApp
@@ -13,8 +19,10 @@ module Lib
 import           Data.Aeson
 import           Network.Wai                   ( Application )
 import           GHC.Generics                  ( Generic )
+import           GHC.TypeLits
 import           Network.Wai.Handler.Warp      ( run )
 import           Servant
+import           Servant.API.Generic
 import           System.Exit                   ( die )
 import           System.Directory              ( getCurrentDirectory )    
 import           Control.Exception             (bracket, try)
@@ -36,11 +44,10 @@ import qualified Data.ByteString               as BS
     -- Module structure:
 -- 1. Run app function and config
 -- 2. Server app declaration
--- 3. Server query declaration
--- 4. Cache impementation
--- 5. Block of declarations for working with the source forecast server
--- 6. Config and configuration functions
--- 7. Logger
+-- 3. Cache impementation
+-- 4. Block of declarations for working with the source forecast server
+-- 5. Config and configuration functions
+-- 6. Logger
 
 
 
@@ -50,7 +57,9 @@ runApp enviroment = do
     let port = serverPort enviroment
     cacheHolder <- initCacheHolder
     let runServer = logInfo "Server starts" >> run port (app enviroment cacheHolder)
-    let fillCache = logInfo "Cash filler starts" >> cacheFiller enviroment cacheHolder
+    let fillCache = case locations enviroment of
+            [] -> logWarn "Empty locations field in config. Nothing to cache"
+            _  -> logInfo "Cash filler starts" >> cacheFiller enviroment cacheHolder
     _ <- forkIO fillCache
     _ <- forkIO runServer
     forever $ threadDelay 1800000000
@@ -60,12 +69,15 @@ runApp enviroment = do
 
 -- | 2. Server app declaration
 app :: ServerEnviroment -> CacheHolder -> Application
-app env cacheHolder = do
-    serve api $ hoistServer api (nt cacheHolder) (server env cacheHolder)
+app env cacheHolder =
+    case someSymbolVal $ rootAPI env of
+        SomeSymbol (Proxy :: Proxy var') -> do
+            let api = Proxy @(WeatherAPI var')
+            serve api (hoistServer api (nt cacheHolder) (server env cacheHolder))
 
 type AppM = ReaderT CacheHolder Handler
 
-server :: ServerEnviroment -> CacheHolder -> ServerT WeatherAPI AppM
+server :: ServerEnviroment -> CacheHolder -> ServerT (WeatherAPI a) AppM
 server = getWeather
             -- Query implementation
     where   getWeather :: ServerEnviroment -> CacheHolder -> Location -> Time.POSIXTime -> AppM Weather
@@ -73,7 +85,7 @@ server = getWeather
                 cache <- liftIO $ readCache cacheHolder
                 case L.find (predicate env loc date) cache of
                     Just weather -> liftIO $ logDebug ("" <> show weather <> " found in cash") >> return weather
-                    Nothing      -> liftIO $ logDebug "Didn't found anything in cash" >> getWeatherFromSourceAPI (apikey env) loc
+                    Nothing      -> liftIO $ logDebug "Didn't found anything in cash"          >> getWeatherFromSourceAPI (apikey env) loc
 
 predicate ::  ServerEnviroment -> Location -> Time.POSIXTime -> (Weather -> Bool)
 predicate env loc time = \weather -> 
@@ -82,27 +94,19 @@ predicate env loc time = \weather ->
 
 nt :: CacheHolder -> AppM a -> Handler a
 nt cacheHolder appMonad = runReaderT appMonad cacheHolder
+
+
+type WeatherAPI (prefix :: Symbol) = 
+    prefix :> 
+    "city" :> Capture "city" String :> 
+    "time" :> Capture "time" Time.POSIXTime 
+    :> Get '[JSON] Weather
+    -- GET "localhost:8080/weatherapi/city/*city*/time/*time*
 -- | 
 
 
 
--- | 3. Server query declaration
-api :: Proxy WeatherAPI
-api = Proxy  -- ("root" :> WeatherAPI)
-
-newtype (WeatherAPI' a) = WeatherAPI' (a :> WeatherAPI)
-type WeatherAPI = "weather"
-    :> "city"
-    :> Capture "city" String
-    :> "time"
-    :> Capture "time" Time.POSIXTime
-    :> Get '[JSON] Weather
-    -- GET "localhost:8080/weather/city/*city*/time/*time*
--- |
-
-
-
--- | 4. Cache implementation
+-- | 3. Cache implementation
 newtype CacheHolder = CacheHolder
     { weatherCache :: TVar [Weather]
     }
@@ -133,7 +137,7 @@ initCacheHolder = CacheHolder <$> newTVarIO []
 
 
 
--- | 5. Block of declarations for working with the source forecast server
+-- | 4. Block of declarations for working with the source forecast server
 -- This function sends a request to the weather forecasts server and parses the result into the custom type
 getWeatherFromSourceAPI :: APIKey -> Location -> IO Weather
 getWeatherFromSourceAPI key loc =  do
@@ -174,10 +178,11 @@ instance ToJSON Weather where
 
 
 
--- | 6. Config and configuration functions
+-- | 5. Config and configuration functions
 data ServerEnviroment = ServerEnviroment
     { serverPort :: Int
     , apikey :: APIKey
+    , rootAPI :: String
     , locations :: [Location]
     -- This option is responsible for the delay between cache fillings 
     , cacheFillingsDelay :: Int -- miliseconds
@@ -215,9 +220,6 @@ createConfigFile = do
     putStrLn "Default config was created. You can change it in config.yaml"
     config <- changeKey env
     writeToConfigFile config
-    putStrLn "Enter any key to load config"
-    _ <- getLine
-    return ()
 
 writeToConfigFile :: ServerEnviroment -> IO ()
 writeToConfigFile config = do
@@ -234,8 +236,9 @@ changeKey config = do
 env :: ServerEnviroment
 env = ServerEnviroment
     { serverPort = 8080
-    , locations = ["London", "Boston"]
     , apikey = ""
+    , rootAPI = "weatherapi"
+    , locations = ["Rostov-on-Don", "Moscow", "Saint Petersburg"]
     , cacheFillingsDelay = 90 * 1000000  -- miliseconds
     , maxDeviation = 3600 -- seconds
     }
@@ -246,7 +249,7 @@ type Location = String
 
 
 
--- | 7. Logger
+-- | 6. Logger
 data Logger = Logger
     { logInfoToConsole :: String -> IO ()
     , logWarnToConsole :: String -> IO ()
