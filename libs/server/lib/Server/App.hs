@@ -28,14 +28,14 @@ import qualified Data.List                     as L
 
 import           Logger                        ( logInfo, logWarn, logDebug )
 import           Config                        ( Config(..), configurate )
-import           Server.Cache                  ( cacheFiller, readCache, initCacheHolder, CacheState )
+import           Server.Cache                  ( cacheFiller, readCache, initCacheState, CacheState )
 import           Server.ExternalAPI            ( Weather(city, requestTime), getWeatherFromSourceAPI, Location )
 
 -- | 1. Run app function
 runApp :: Config -> IO ()
 runApp enviroment = do
     let port = serverPort enviroment
-    cacheState <- initCacheHolder
+    cacheState <- initCacheState
     let runServer = logInfo "Server starts" >> run port (app enviroment cacheState)
     let fillCache = case locations enviroment of
             [] -> logWarn "Empty locations field in config. Nothing to cache"
