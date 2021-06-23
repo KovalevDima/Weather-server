@@ -29,4 +29,6 @@ library
                      , transformers
                      , time
                      , exceptions
+                     , yaml
+                     , directory
   default-language:    Haskell2010

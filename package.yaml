@@ -15,7 +15,6 @@ dependencies:
   - base >= 4.7 && < 5
   - server
 
-
 executables:
   Weather-server:
     source-dirs:      src
