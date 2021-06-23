@@ -4,7 +4,7 @@
 
 module Main where
 
-import           Lib ( runApp, configurate )
+import           Server.App ( runApp, configurate )
 
 
 main :: IO ()

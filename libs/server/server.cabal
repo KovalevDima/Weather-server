@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      lib
-  exposed-modules:     Lib
+  exposed-modules:     Logger, Config, Server.App Server.ExternalAPI, Server.Cache
   build-depends:       base >= 4.7 && < 5
                      , bytestring
                      , servant
