@@ -3,16 +3,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.ExternalAPI ( Weather(..), getWeatherFromSourceAPI, Location, APIKey ) where
-        
-import           Data.Aeson                    ( (.:), withObject, defaultOptions, genericToEncoding, FromJSON(parseJSON), ToJSON(toEncoding) )
+module Server.ExternalAPI ( Weather(..), getWeatherFromSourceAPI, Location, APIKey) where
+-- External modules
+import           Data.Aeson                    ( (.:), withObject, defaultOptions, genericToEncoding, FromJSON(parseJSON), ToJSON(toEncoding), encode, decode)
 import           System.Exit                   ( die )
 import           GHC.Generics                  ( Generic )
 import qualified Control.Exception             as E
 import qualified Data.Time.Clock.POSIX         as Time
 import qualified Network.HTTP.Simple           as HTTPS
 import qualified Network.HTTP.Client           as HTTPC
-
+-- Internal modules
 import           Config                        ( Location, APIKey )
 
 
@@ -22,6 +22,7 @@ getWeatherFromSourceAPI key loc =  do
     url <- HTTPC.parseUrlThrow ("http://api.weatherapi.com/v1/current.json?key=" <> key <> "&q=" <> loc <> "&aqi=no")
     fetchForecast url
 
+-- This function parses the request from source API server
 fetchForecast :: HTTPC.Request -> IO Weather
 fetchForecast url = 
     E.catch
