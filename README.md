@@ -1,3 +1,8 @@
+# Motivation
+It was my test task for Haskell Junior Back-end Developer position at GetShopTV
+
+
+
 # Weather-server
 This is a simple prototype of proxy server with weather forecasts caching
 
